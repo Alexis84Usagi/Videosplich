@@ -629,4 +629,257 @@
         }
 
         // Ouvrir le modal d'ajout d'épisode
-        function op
+        function openAddEpisodeModal() {
+            document.getElementById('addEpisodeModal').style.display = 'block';
+            document.getElementById('message-container').innerHTML = '';
+            document.getElementById('addEpisodeForm').reset();
+            document.getElementById('videoPreview').style.display = 'none';
+            currentVideoFile = null;
+            
+            // Sélectionner "vidéo seulement" par défaut
+            document.querySelector('input[name="contentType"][value="video"]').checked = true;
+            toggleContentType();
+        }
+
+        // Fermer le modal d'ajout d'épisode
+        function closeAddEpisodeModal() {
+            document.getElementById('addEpisodeModal').style.display = 'none';
+            document.getElementById('addEpisodeForm').reset();
+            document.getElementById('videoPreview').style.display = 'none';
+            document.getElementById('message-container').innerHTML = '';
+            currentVideoFile = null;
+        }
+
+        // Ajouter une nouvelle série
+        document.getElementById('addSeriesForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const name = document.getElementById('seriesName').value.trim();
+            if (!name) return;
+            
+            const newSeries = {
+                id: Date.now(),
+                name: name,
+                episodes: []
+            };
+            
+            series.push(newSeries);
+            
+            if (saveData()) {
+                displaySeries();
+                closeAddSeriesModal();
+                console.log('Série ajoutée:', newSeries);
+            }
+        });
+
+        // Ajouter un nouvel épisode
+        document.getElementById('addEpisodeForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const title = document.getElementById('episodeTitle').value.trim();
+            const contentType = document.querySelector('input[name="contentType"]:checked').value;
+            const content = document.getElementById('episodeContent').value.trim();
+            
+            if (!title) {
+                showMessage('Veuillez saisir le titre de l\'épisode.', 'error');
+                return;
+            }
+            
+            // Vérifications selon le type de contenu
+            if (contentType === 'text' && !content) {
+                showMessage('Veuillez saisir le contenu de l\'épisode.', 'error');
+                return;
+            }
+            
+            if ((contentType === 'video' || contentType === 'both') && !currentVideoFile) {
+                showMessage('Veuillez sélectionner une vidéo.', 'error');
+                return;
+            }
+            
+            if (contentType === 'both' && !content) {
+                showMessage('Veuillez saisir le contenu de l\'épisode.', 'error');
+                return;
+            }
+            
+            const serie = series.find(s => s.id === currentSeriesId);
+            if (!serie) {
+                showMessage('Erreur: série non trouvée.', 'error');
+                return;
+            }
+            
+            showMessage('Ajout en cours...', 'success');
+            
+            const newEpisode = {
+                id: Date.now(),
+                title: title,
+                contentType: contentType
+            };
+            
+            // Ajouter le contenu texte si nécessaire
+            if (contentType === 'text' || contentType === 'both') {
+                newEpisode.content = content;
+            }
+            
+            // Ajouter la vidéo si nécessaire
+            if ((contentType === 'video' || contentType === 'both') && currentVideoFile) {
+                try {
+                    const videoData = await fileToBase64(currentVideoFile);
+                    newEpisode.videoData = videoData;
+                    newEpisode.videoName = currentVideoFile.name;
+                    newEpisode.videoType = currentVideoFile.type;
+                } catch (error) {
+                    showMessage('Erreur lors de la lecture de la vidéo.', 'error');
+                    return;
+                }
+            }
+            
+            // Ajouter l'épisode à la série
+            serie.episodes.push(newEpisode);
+            
+            console.log('Épisode créé:', newEpisode);
+            console.log('Série mise à jour:', serie);
+            
+            if (saveData()) {
+                showMessage('Épisode ajouté avec succès !', 'success');
+                setTimeout(() => {
+                    viewSeries(currentSeriesId);
+                    closeAddEpisodeModal();
+                }, 1000);
+            } else {
+                // Retirer l'épisode en cas d'échec de sauvegarde
+                serie.episodes.pop();
+                showMessage('Erreur lors de la sauvegarde.', 'error');
+            }
+        });
+
+        // Voir une série
+        function viewSeries(seriesId) {
+            currentSeriesId = seriesId;
+            const serie = series.find(s => s.id === seriesId);
+            
+            if (!serie) {
+                console.error('Série non trouvée:', seriesId);
+                return;
+            }
+            
+            console.log('Affichage de la série:', serie);
+            
+            document.getElementById('main-view').style.display = 'none';
+            document.getElementById('series-detail-view').style.display = 'block';
+            document.getElementById('reader-view').style.display = 'none';
+            
+            const content = document.getElementById('series-detail-content');
+            content.innerHTML = `
+                <h1>${serie.name}</h1>
+                <button class="btn" onclick="openAddEpisodeModal()">➕ Ajouter un épisode</button>
+                
+                <div class="episode-list">
+                    ${!serie.episodes || serie.episodes.length === 0 ? 
+                        '<div class="empty-state">Aucun épisode ajouté. Commencez par créer votre premier épisode !</div>' : 
+                        serie.episodes.map(episode => `
+                            <div class="episode-item">
+                                <div class="episode-title">
+                                    ${episode.title}
+                                    ${episode.videoData ? '<span class="has-video-indicator">🎥</span>' : ''}
+                                </div>
+                                ${episode.videoData ? `
+                                    <div class="episode-video">
+                                        <video controls>
+                                            <source src="${episode.videoData}" type="${episode.videoType}">
+                                            Votre navigateur ne supporte pas la lecture vidéo.
+                                        </video>
+                                    </div>
+                                ` : ''}
+                                ${episode.content ? `
+                                    <div class="episode-content">
+                                        ${episode.content.substring(0, 200)}${episode.content.length > 200 ? '...' : ''}
+                                    </div>
+                                ` : ''}
+                                <div class="episode-buttons">
+                                    ${episode.content ? `<button class="btn btn-secondary" onclick="readEpisode(${episode.id})">📖 Lire</button>` : ''}
+                                    <button class="btn btn-danger" onclick="deleteEpisode(${episode.id})">🗑️ Supprimer</button>
+                                </div>
+                            </div>
+                        `).join('')
+                    }
+                </div>
+            `;
+        }
+
+        // Lire un épisode
+        function readEpisode(episodeId) {
+            const serie = series.find(s => s.id === currentSeriesId);
+            if (!serie) return;
+            
+            const episode = serie.episodes.find(e => e.id === episodeId);
+            if (!episode) return;
+            
+            currentEpisodeId = episodeId;
+            
+            document.getElementById('series-detail-view').style.display = 'none';
+            document.getElementById('reader-view').style.display = 'block';
+            
+            document.getElementById('reader-title').textContent = episode.title;
+            document.getElementById('reader-content').innerHTML = episode.content.replace(/\n/g, '<br>');
+        }
+
+        // Supprimer une série
+        function deleteSeries(seriesId) {
+            if (confirm('Êtes-vous sûr de vouloir supprimer cette série et tous ses épisodes ?')) {
+                series = series.filter(s => s.id !== seriesId);
+                if (saveData()) {
+                    displaySeries();
+                    console.log('Série supprimée:', seriesId);
+                }
+            }
+        }
+
+        // Supprimer un épisode
+        function deleteEpisode(episodeId) {
+            if (confirm('Êtes-vous sûr de vouloir supprimer cet épisode ?')) {
+                const serie = series.find(s => s.id === currentSeriesId);
+                if (serie) {
+                    const episodeIndex = serie.episodes.findIndex(e => e.id === episodeId);
+                    if (episodeIndex !== -1) {
+                        serie.episodes.splice(episodeIndex, 1);
+                        if (saveData()) {
+                            viewSeries(currentSeriesId);
+                            console.log('Épisode supprimé:', episodeId);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Afficher la vue principale
+        function showMainView() {
+            document.getElementById('main-view').style.display = 'block';
+            document.getElementById('series-detail-view').style.display = 'none';
+            document.getElementById('reader-view').style.display = 'none';
+            currentSeriesId = null;
+        }
+
+        // Afficher les détails de la série
+        function showSeriesDetail() {
+            document.getElementById('series-detail-view').style.display = 'block';
+            document.getElementById('reader-view').style.display = 'none';
+        }
+
+        // Fermer les modals en cliquant en dehors
+        window.onclick = function(event) {
+            const addSeriesModal = document.getElementById('addSeriesModal');
+            const addEpisodeModal = document.getElementById('addEpisodeModal');
+            
+            if (event.target === addSeriesModal) {
+                closeAddSeriesModal();
+            }
+            if (event.target === addEpisodeModal) {
+                closeAddEpisodeModal();
+            }
+        }
+
+        // Charger les données au démarrage
+        loadData();
+    </script>
+</body>
+</html>
