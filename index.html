@@ -214,6 +214,56 @@
     <script>
         let episodes = [];
 
+        // Charger les épisodes depuis IndexedDB au démarrage
+        function loadEpisodes() {
+            const request = indexedDB.open('EpisodesDB', 1);
+            
+            request.onerror = function(event) {
+                console.error('Erreur lors de l\'ouverture de la base de données');
+            };
+            
+            request.onsuccess = function(event) {
+                const db = event.target.result;
+                const transaction = db.transaction(['episodes'], 'readonly');
+                const store = transaction.objectStore('episodes');
+                const getAllRequest = store.getAll();
+                
+                getAllRequest.onsuccess = function(event) {
+                    episodes = event.target.result || [];
+                    renderEpisodes();
+                };
+            };
+            
+            request.onupgradeneeded = function(event) {
+                const db = event.target.result;
+                const objectStore = db.createObjectStore('episodes', { keyPath: 'id' });
+            };
+        }
+
+        // Sauvegarder un épisode dans IndexedDB
+        function saveEpisode(episode) {
+            const request = indexedDB.open('EpisodesDB', 1);
+            
+            request.onsuccess = function(event) {
+                const db = event.target.result;
+                const transaction = db.transaction(['episodes'], 'readwrite');
+                const store = transaction.objectStore('episodes');
+                store.add(episode);
+            };
+        }
+
+        // Supprimer un épisode de IndexedDB
+        function deleteEpisodeFromDB(id) {
+            const request = indexedDB.open('EpisodesDB', 1);
+            
+            request.onsuccess = function(event) {
+                const db = event.target.result;
+                const transaction = db.transaction(['episodes'], 'readwrite');
+                const store = transaction.objectStore('episodes');
+                store.delete(id);
+            };
+        }
+
         document.getElementById('episodeForm').addEventListener('submit', function(e) {
             e.preventDefault();
             
@@ -230,6 +280,7 @@
                     };
                     
                     episodes.push(episode);
+                    saveEpisode(episode);
                     renderEpisodes();
                     
                     // Reset form
@@ -277,12 +328,13 @@
         function deleteEpisode(id) {
             if (confirm('Êtes-vous sûr de vouloir supprimer cet épisode ?')) {
                 episodes = episodes.filter(episode => episode.id !== id);
+                deleteEpisodeFromDB(id);
                 renderEpisodes();
             }
         }
 
-        // Initialize
-        renderEpisodes();
+        // Charger les épisodes au démarrage
+        loadEpisodes();
     </script>
 </body>
 </html>
