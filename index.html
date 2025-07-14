@@ -116,9 +116,9 @@
             background: #1a1a1a;
             padding: 30px;
             border-radius: 8px;
-            max-width: 500px;
+            max-width: 600px;
             width: 90%;
-            max-height: 80vh;
+            max-height: 90vh;
             overflow-y: auto;
             border: 1px solid #333;
         }
@@ -188,7 +188,7 @@
         }
 
         .reader-view {
-            max-width: 800px;
+            max-width: 900px;
             margin: 0 auto;
             padding: 40px;
             background: #1a1a1a;
@@ -217,6 +217,7 @@
         .episode-buttons {
             display: flex;
             gap: 10px;
+            flex-wrap: wrap;
         }
 
         .episode-buttons button {
@@ -234,6 +235,94 @@
         h2 {
             color: #e50914;
             margin-bottom: 20px;
+        }
+
+        .video-upload-section {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 2px dashed #555;
+        }
+
+        .video-upload-section h3 {
+            color: #e50914;
+            margin-bottom: 15px;
+        }
+
+        .video-preview {
+            margin-top: 15px;
+            text-align: center;
+        }
+
+        .video-preview video {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: 4px;
+            border: 1px solid #333;
+        }
+
+        .video-info {
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #999;
+        }
+
+        .episode-video {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .episode-video video {
+            max-width: 100%;
+            max-height: 400px;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+
+        .video-controls {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .video-controls button {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        .content-type-selector {
+            margin-bottom: 20px;
+        }
+
+        .content-type-selector label {
+            display: inline-block;
+            margin-right: 20px;
+            cursor: pointer;
+        }
+
+        .content-type-selector input[type="radio"] {
+            margin-right: 8px;
+        }
+
+        .has-video-indicator {
+            background: #e50914;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            margin-left: 10px;
+        }
+
+        .video-thumbnail {
+            width: 60px;
+            height: 40px;
+            object-fit: cover;
+            border-radius: 4px;
+            margin-right: 10px;
+            vertical-align: middle;
         }
     </style>
 </head>
@@ -294,10 +383,42 @@
                     <label for="episodeTitle">Titre de l'épisode:</label>
                     <input type="text" id="episodeTitle" required>
                 </div>
+                
                 <div class="form-group">
+                    <label>Type de contenu:</label>
+                    <div class="content-type-selector">
+                        <label>
+                            <input type="radio" name="contentType" value="text" checked onchange="toggleContentType()">
+                            📝 Texte
+                        </label>
+                        <label>
+                            <input type="radio" name="contentType" value="video" onchange="toggleContentType()">
+                            🎥 Vidéo
+                        </label>
+                        <label>
+                            <input type="radio" name="contentType" value="both" onchange="toggleContentType()">
+                            📝🎥 Texte + Vidéo
+                        </label>
+                    </div>
+                </div>
+
+                <div id="videoUploadSection" class="video-upload-section" style="display: none;">
+                    <h3>🎬 Ajouter une vidéo</h3>
+                    <div class="form-group">
+                        <label for="videoFile">Choisir une vidéo depuis votre galerie:</label>
+                        <input type="file" id="videoFile" accept="video/*" onchange="previewVideo()">
+                    </div>
+                    <div id="videoPreview" class="video-preview" style="display: none;">
+                        <video id="previewVideo" controls></video>
+                        <div class="video-info" id="videoInfo"></div>
+                    </div>
+                </div>
+
+                <div id="textContentSection" class="form-group">
                     <label for="episodeContent">Contenu de l'épisode:</label>
                     <textarea id="episodeContent" rows="15" required></textarea>
                 </div>
+
                 <button type="submit" class="btn">Ajouter l'épisode</button>
             </form>
         </div>
@@ -306,6 +427,7 @@
     <script>
         let series = [];
         let currentSeriesId = null;
+        let currentVideoFile = null;
 
         // Charger les données depuis la mémoire
         function loadData() {
@@ -320,6 +442,63 @@
             window.savedSeries = series;
         }
 
+        // Basculer entre les types de contenu
+        function toggleContentType() {
+            const contentType = document.querySelector('input[name="contentType"]:checked').value;
+            const videoSection = document.getElementById('videoUploadSection');
+            const textSection = document.getElementById('textContentSection');
+            const textArea = document.getElementById('episodeContent');
+
+            if (contentType === 'text') {
+                videoSection.style.display = 'none';
+                textSection.style.display = 'block';
+                textArea.required = true;
+            } else if (contentType === 'video') {
+                videoSection.style.display = 'block';
+                textSection.style.display = 'none';
+                textArea.required = false;
+            } else if (contentType === 'both') {
+                videoSection.style.display = 'block';
+                textSection.style.display = 'block';
+                textArea.required = true;
+            }
+        }
+
+        // Prévisualiser la vidéo
+        function previewVideo() {
+            const fileInput = document.getElementById('videoFile');
+            const previewContainer = document.getElementById('videoPreview');
+            const previewVideo = document.getElementById('previewVideo');
+            const videoInfo = document.getElementById('videoInfo');
+
+            if (fileInput.files && fileInput.files[0]) {
+                const file = fileInput.files[0];
+                currentVideoFile = file;
+
+                const url = URL.createObjectURL(file);
+                previewVideo.src = url;
+                previewContainer.style.display = 'block';
+
+                // Afficher les informations de la vidéo
+                const fileSize = (file.size / (1024 * 1024)).toFixed(2);
+                videoInfo.innerHTML = `
+                    <strong>Nom:</strong> ${file.name}<br>
+                    <strong>Taille:</strong> ${fileSize} MB<br>
+                    <strong>Type:</strong> ${file.type}
+                `;
+            }
+        }
+
+        // Convertir le fichier en base64
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
         // Afficher toutes les séries
         function displaySeries() {
             const grid = document.getElementById('series-grid');
@@ -331,11 +510,15 @@
             }
 
             series.forEach(serie => {
+                const videoEpisodes = serie.episodes.filter(ep => ep.videoData).length;
                 const card = document.createElement('div');
                 card.className = 'series-card';
                 card.innerHTML = `
                     <div class="series-title">${serie.name}</div>
-                    <div class="episode-count">${serie.episodes.length} épisode(s)</div>
+                    <div class="episode-count">
+                        ${serie.episodes.length} épisode(s)
+                        ${videoEpisodes > 0 ? `<span class="has-video-indicator">🎥 ${videoEpisodes}</span>` : ''}
+                    </div>
                     <button class="btn btn-secondary" onclick="viewSeries(${serie.id})">Voir les épisodes</button>
                     <button class="btn btn-danger" onclick="deleteSeries(${serie.id})">Supprimer</button>
                 `;
@@ -357,12 +540,19 @@
         // Ouvrir le modal d'ajout d'épisode
         function openAddEpisodeModal() {
             document.getElementById('addEpisodeModal').style.display = 'block';
+            // Réinitialiser le formulaire
+            document.getElementById('addEpisodeForm').reset();
+            document.querySelector('input[name="contentType"][value="text"]').checked = true;
+            toggleContentType();
+            currentVideoFile = null;
         }
 
         // Fermer le modal d'ajout d'épisode
         function closeAddEpisodeModal() {
             document.getElementById('addEpisodeModal').style.display = 'none';
             document.getElementById('addEpisodeForm').reset();
+            document.getElementById('videoPreview').style.display = 'none';
+            currentVideoFile = null;
         }
 
         // Ajouter une nouvelle série
@@ -385,21 +575,52 @@
         });
 
         // Ajouter un nouvel épisode
-        document.getElementById('addEpisodeForm').addEventListener('submit', function(e) {
+        document.getElementById('addEpisodeForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const title = document.getElementById('episodeTitle').value.trim();
             const content = document.getElementById('episodeContent').value.trim();
+            const contentType = document.querySelector('input[name="contentType"]:checked').value;
             
-            if (!title || !content) return;
+            if (!title) return;
+            
+            // Vérifier que le contenu requis est fourni
+            if (contentType === 'text' && !content) {
+                alert('Veuillez saisir le contenu de l\'épisode.');
+                return;
+            }
+            
+            if (contentType === 'video' && !currentVideoFile) {
+                alert('Veuillez sélectionner une vidéo.');
+                return;
+            }
+            
+            if (contentType === 'both' && (!content || !currentVideoFile)) {
+                alert('Veuillez saisir le contenu et sélectionner une vidéo.');
+                return;
+            }
             
             const serie = series.find(s => s.id === currentSeriesId);
             if (serie) {
                 const newEpisode = {
                     id: Date.now(),
                     title: title,
-                    content: content
+                    content: content || '',
+                    contentType: contentType
                 };
+                
+                // Ajouter la vidéo si elle existe
+                if (currentVideoFile) {
+                    try {
+                        const videoData = await fileToBase64(currentVideoFile);
+                        newEpisode.videoData = videoData;
+                        newEpisode.videoName = currentVideoFile.name;
+                        newEpisode.videoType = currentVideoFile.type;
+                    } catch (error) {
+                        alert('Erreur lors de la lecture de la vidéo.');
+                        return;
+                    }
+                }
                 
                 serie.episodes.push(newEpisode);
                 saveData();
@@ -416,89 +637,4 @@
             if (!serie) return;
             
             document.getElementById('main-view').style.display = 'none';
-            document.getElementById('series-detail-view').style.display = 'block';
-            
-            const detailContent = document.getElementById('series-detail-content');
-            detailContent.innerHTML = `
-                <h2>📚 ${serie.name}</h2>
-                
-                <button class="btn" onclick="openAddEpisodeModal()">➕ Ajouter un épisode</button>
-                
-                <div class="episode-list">
-                    ${serie.episodes.length === 0 ? 
-                        '<div class="empty-state">Aucun épisode pour le moment. Ajoutez votre premier épisode !</div>' :
-                        serie.episodes.map((episode, index) => `
-                            <div class="episode-item">
-                                <div class="episode-title">Épisode ${index + 1}: ${episode.title}</div>
-                                <div class="episode-content">${episode.content.substring(0, 150)}${episode.content.length > 150 ? '...' : ''}</div>
-                                <div class="episode-buttons">
-                                    <button class="btn btn-secondary" onclick="readEpisode(${episode.id})">Lire</button>
-                                    <button class="btn btn-danger" onclick="deleteEpisode(${episode.id})">Supprimer</button>
-                                </div>
-                            </div>
-                        `).join('')
-                    }
-                </div>
-            `;
-        }
-
-        // Lire un épisode
-        function readEpisode(episodeId) {
-            const serie = series.find(s => s.id === currentSeriesId);
-            const episode = serie.episodes.find(e => e.id === episodeId);
-            
-            if (!episode) return;
-            
-            document.getElementById('series-detail-view').style.display = 'none';
-            document.getElementById('reader-view').style.display = 'block';
-            
-            document.getElementById('reader-title').textContent = episode.title;
-            document.getElementById('reader-content').innerHTML = episode.content.replace(/\n/g, '<br>');
-        }
-
-        // Supprimer une série
-        function deleteSeries(seriesId) {
-            if (confirm('Êtes-vous sûr de vouloir supprimer cette série et tous ses épisodes ?')) {
-                series = series.filter(s => s.id !== seriesId);
-                saveData();
-                displaySeries();
-            }
-        }
-
-        // Supprimer un épisode
-        function deleteEpisode(episodeId) {
-            if (confirm('Êtes-vous sûr de vouloir supprimer cet épisode ?')) {
-                const serie = series.find(s => s.id === currentSeriesId);
-                if (serie) {
-                    serie.episodes = serie.episodes.filter(e => e.id !== episodeId);
-                    saveData();
-                    viewSeries(currentSeriesId);
-                }
-            }
-        }
-
-        // Retour à la vue principale
-        function showMainView() {
-            document.getElementById('main-view').style.display = 'block';
-            document.getElementById('series-detail-view').style.display = 'none';
-            document.getElementById('reader-view').style.display = 'none';
-        }
-
-        // Retour à la vue de la série
-        function showSeriesDetail() {
-            document.getElementById('series-detail-view').style.display = 'block';
-            document.getElementById('reader-view').style.display = 'none';
-        }
-
-        // Fermer les modals en cliquant à l'extérieur
-        window.addEventListener('click', function(e) {
-            if (e.target.classList.contains('modal')) {
-                e.target.style.display = 'none';
-            }
-        });
-
-        // Charger les données au démarrage
-        loadData();
-    </script>
-</body>
-                      </html>
+            document.getElementById('series-detai
